@@ -17,7 +17,8 @@
 #include <I2Cdev.h>
 #include <Wire.h> //Include the Wire.h library so we can communicate with the gyro
 #include "MPU_Final.h"
-#include <Servo.h>
+#include "../TimerOne.h"
+
 #include <SoftwareSerial.h>
 //#include "pidTest.h"
 #define YPR_DEBUG 0
@@ -86,20 +87,12 @@ float pitch_offset = 0;
 float yaw_offset =0;
 float throttle_offset=0;
 
-Servo m1;
-Servo m2;
-Servo m3;
-Servo m4;
-
-int m1Pin=6;//front right 
-int m2Pin=10;//back right
-int m3Pin=5;//back left
-int m4Pin=9;//front left 
 
 char r;
 int parse_count=0;
 int ledPin=8;
 
+//SoftwareSerial ser(12,11);// bluetooth rx, tx
 SoftwareSerial ser(12,11);// bluetooth rx, tx
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +108,11 @@ void setup()
   Serial.begin(115200);// debugging
   Wire.begin();//Start the I2C as master.
   
+  
+  
+  DDRD |= B11110000;                        //Configure digital poort 4, 5, 6 and 7 as output.
+
+
 
    /////////////////////////////////////////////////////////////////////
   //                 Wait for input from master
@@ -124,20 +122,23 @@ void setup()
   while (ser.available() && ser.read()); // empty buffer
   while (!ser.available());                 // wait for data
   while (ser.available() && ser.read()); // empty buffer again
+
+
+
+
+
+
+//We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
+    PORTD |= B11110000;                                        //Set digital poort 4, 5, 6 and 7 high.
+    delayMicroseconds(1000);                                   //Wait 1000us.
+    PORTD &= B00001111;                                        //Set digital poort 4, 5, 6 and 7 low.
+    delay(3);                                                  //Wait 3 milliseconds before the next loop.
+
+
+
+
   
 
-  //reflects min and max pulse width of the esc
-  m1.attach(m1Pin);
-  m2.attach(m2Pin);
-  m3.attach(m3Pin);
-  m4.attach(m4Pin);
-
-  
-  m1.write(0);
-  m2.write(0);
-  m3.write(0);
-  m4.write(0);
-  
   MPU_Init();
   calibrateJoyStick();
 
@@ -302,12 +303,9 @@ void loop()
     Serial.println(valid);
     if(valid)
     {
-      m1.write(esc_1);
-      m2.write(esc_2);
-      m3.write(esc_3);
-      m4.write(esc_4);
+      
     }
-    delay(2);
+    
     
 
     if(JOYSTICK_DEBUG)
@@ -472,6 +470,8 @@ void calculate_pid()
   pid_last_yaw_d_error = pid_error_temp;
 }
 
+
+
 void getJoyStickValues()
 {
   //Serial.print(".");
@@ -500,7 +500,6 @@ void getJoyStickValues()
         if(serialCount == 1)
         {
           throttle = ser.read();
-          throttle = map(throttle, 0, 250, 0,180);
         }
         else if(serialCount == 2)
         {
@@ -542,7 +541,6 @@ void getJoyStickValues()
     
   }
  
-  
 }
 
 
@@ -563,6 +561,68 @@ void calibrateJoyStick()
   throttle_offset = throttle_offset/100;
 
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//This routine is called every time input 8, 9, 10 or 11 changed state
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ISR(PCINT0_vect)
+{
+  current_time = micros();
+  //Channel 1=========================================
+  if(PINB & B00000001)
+  {                                                            //Is input 8 high?
+    if(last_channel_1 == 0){                                   //Input 8 changed from 0 to 1
+      last_channel_1 = 1;                                      //Remember current input state
+      timer_1 = current_time;                                  //Set timer_1 to current_time
+    }
+  }
+  else if(last_channel_1 == 1){                                //Input 8 is not high and changed from 1 to 0
+    last_channel_1 = 0;                                        //Remember current input state
+    receiver_input_channel_1 = current_time - timer_1;         //Channel 1 is current_time - timer_1
+  }
+  //Channel 2=========================================
+  if(PINB & B00000010 ){                                       //Is input 9 high?
+    if(last_channel_2 == 0){                                   //Input 9 changed from 0 to 1
+      last_channel_2 = 1;                                      //Remember current input state
+      timer_2 = current_time;                                  //Set timer_2 to current_time
+    }
+  }
+  else if(last_channel_2 == 1){                                //Input 9 is not high and changed from 1 to 0
+    last_channel_2 = 0;                                        //Remember current input state
+    receiver_input_channel_2 = current_time - timer_2;         //Channel 2 is current_time - timer_2
+  }
+  //Channel 3=========================================
+  if(PINB & B00000100 ){                                       //Is input 10 high?
+    if(last_channel_3 == 0){                                   //Input 10 changed from 0 to 1
+      last_channel_3 = 1;                                      //Remember current input state
+      timer_3 = current_time;                                  //Set timer_3 to current_time
+    }
+  }
+  else if(last_channel_3 == 1){                                //Input 10 is not high and changed from 1 to 0
+    last_channel_3 = 0;                                        //Remember current input state
+    receiver_input_channel_3 = current_time - timer_3;         //Channel 3 is current_time - timer_3
+
+  }
+  //Channel 4=========================================
+  if(PINB & B00001000 ){                                       //Is input 11 high?
+    if(last_channel_4 == 0){                                   //Input 11 changed from 0 to 1
+      last_channel_4 = 1;                                      //Remember current input state
+      timer_4 = current_time;                                  //Set timer_4 to current_time
+    }
+  }
+  else if(last_channel_4 == 1){                                //Input 11 is not high and changed from 1 to 0
+    last_channel_4 = 0;                                        //Remember current input state
+    receiver_input_channel_4 = current_time - timer_4;         //Channel 4 is current_time - timer_4
+  }
+}
+
+
+
+
+
+
+
 
 
 
