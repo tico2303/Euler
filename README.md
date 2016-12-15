@@ -8,6 +8,6 @@ Euler is a Quadcopter that Robert Martinez and Cody Falzone developed for our CS
  * Brushless DC Motors
  * Electronic Speed Controller (ESC)
  * HC-05 BlueTooth 
- * Parrallax 2-axis Joystick
+ * Parallax 2-axis Joystick
  * Battery Voltage meter
 
